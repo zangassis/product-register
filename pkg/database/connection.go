@@ -2,16 +2,12 @@ package database
 
 import (
 	"database/sql"
+	"log"
 
 	"github.com/assiszang/product-register/internal/structs"
 )
 
-func InitializeDB() (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", "products.db")
-	if err != nil {
-		return nil, err
-	}
-
+func CreateTable(db *sql.DB) {
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS products (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,13 +15,10 @@ func InitializeDB() (*sql.DB, error) {
 			price REAL
 		);
 	`
-
-	_, err = db.Exec(createTableSQL)
+	_, err := db.Exec(createTableSQL)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
-
-	return db, nil
 }
 
 func GetProduct(db *sql.DB, id int) (*structs.Product, error) {
@@ -72,12 +65,27 @@ func GetAllProducts(db *sql.DB) ([]*structs.Product, error) {
 }
 
 func CreateProduct(db *sql.DB, product *structs.Product) error {
+	println("register ")
+
 	insertSQL := `
 		INSERT INTO products (name, price)
 		VALUES (?, ?)
 	`
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = tx.Exec(insertSQL, product.Name, product.Price)
 
-	_, err := db.Exec(insertSQL, product.Name, product.Price)
+	if err != nil {
+		log.Fatal(err)
+		tx.Rollback()
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
 	return err
 }
 
@@ -87,8 +95,21 @@ func UpdateProduct(db *sql.DB, product *structs.Product) error {
 		SET name = ?, price = ?
 		WHERE id = ?
 	`
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = db.Exec(updateSQL, product.Name, product.Price, product.ID)
 
-	_, err := db.Exec(updateSQL, product.Name, product.Price, product.ID)
+	if err != nil {
+		log.Fatal(err)
+		tx.Rollback()
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
 	return err
 }
 
@@ -97,7 +118,23 @@ func DeleteProduct(db *sql.DB, id int) error {
 		DELETE FROM products
 		WHERE id = ?
 	`
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+		println("delete fails in begin")
+	}
+	_, err = db.Exec(deleteSQL, id)
 
-	_, err := db.Exec(deleteSQL, id)
+	if err != nil {
+		log.Fatal(err)
+		tx.Rollback()
+		println("delete fails")
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
+		println("delete fails")
+	}
 	return err
 }
